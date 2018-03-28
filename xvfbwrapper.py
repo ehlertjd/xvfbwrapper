@@ -14,12 +14,7 @@ import time
 
 from random import randint
 
-try:
-    BlockingIOError
-except NameError:
-    # python 2
-    BlockingIOError = IOError
-
+SOFT_FILE_LOCK = os.environ.get('XVFB_WRAPPER_SOFT_FILE_LOCK')
 
 class Xvfb(object):
 
@@ -126,14 +121,36 @@ class Xvfb(object):
         tempfile_path = os.path.join(self._tempdir, '.X{0}-lock')
         while True:
             rand = randint(1, self.__class__.MAX_DISPLAY)
-            self._lock_display_file = open(tempfile_path.format(rand), 'w')
-            try:
-                fcntl.flock(self._lock_display_file,
-                            fcntl.LOCK_EX | fcntl.LOCK_NB)
-            except BlockingIOError:
-                continue
+            if SOFT_FILE_LOCK:
+                self._lock_display_file = self._soft_lock_file(tempfile_path.format(rand))
             else:
+                self._lock_display_file = self._hard_lock_file(tempfile_path.format(rand))
+
+            if self._lock_display_file:
                 return rand
 
     def _set_display_var(self, display):
         os.environ['DISPLAY'] = ':{}'.format(display)
+
+    def _hard_lock_file(self, path):
+        fd = os.open(path, os.O_RDWR | os.O_CREAT | os.O_TRUNC)
+        
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except (IOError, OSError):
+            os.close(fd)
+        else:
+            return fd
+        
+        return None 
+
+    def _soft_lock_file(self, path):
+        try:
+            fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_EXCL)
+        except (IOError, OSError):
+            pass
+        else:
+            return fd
+
+        return None
+
