@@ -24,7 +24,7 @@ except ImportError:
 
 setup(
     name='xvfbwrapper',
-    version='0.2.9',
+    version='0.2.9.post1',
     py_modules=['xvfbwrapper'],
     author='Corey Goldberg',
     author_email='cgoldberg _at_ gmail.com',
